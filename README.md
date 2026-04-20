@@ -22,7 +22,7 @@
 - polyxplorer aims to decrease the dependence on heavy GUI explorers for simple tasks.
 - polyxplorer does not aim to replace GUI (or even other TUI) file explorers.
 
---
+---
 v0.0.0
 - GPL-3.0 license. See LICENSE for more information.
 - Personal project, large userbase is not intended.
