@@ -12,7 +12,7 @@
 
   easy:
 
-  open & print user-specified directory contents                   [ ]
+  open & print user-specified directory contents                   [x]
   ansi codes to move choice around (with J & K)                    [ ]
   allow directory traversal                                        [ ]
   open non-binary files in default text editor (default polyedit)  [ ]
@@ -30,12 +30,9 @@
   - o = open the file in default text editor (if file != binary)
 
 */
+#include <string.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <sys/types.h>
-#include <errno.h>
-#include <dirent.h>
-#include <string.h>
 #include "util.h"
 #include "polyxplorer.h"
 
@@ -45,14 +42,19 @@ int main(int argc, char *argv[])
 {
     Contents *contents = malloc(sizeof(Contents));
 
-    if(argc < 2) {
+    if(argc == 1) {
         get_contents(contents, "."); // set rel path to '.' because i dont want to force users to enter something like `px .` when using this
     }
 
+
+    char *bin_name = argv[0];
     if(argc == 2) {
-        char *bin_name = argv[0];
-        if(!strcmp(argv[1], "--help")) {
+        if(strcmp(argv[1], "--help")) {
+            get_contents(contents, argv[1]);
+        } else {
             printf("polyxplorer %s\n\nofficial page: https://github.com/Polymorqhism/polyxplorer\n\n%s --help\t- to show this help page\n%s [path]\t- open directory. will open cwd\n", VERSION, bin_name, bin_name);
+            free(contents);
+            return 1;
         }
     }
 
