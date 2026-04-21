@@ -5,7 +5,9 @@
 #include <sys/types.h>
 #include <errno.h>
 #include <dirent.h>
+#include <sys/ioctl.h>
 #include <string.h>
+#include <unistd.h>
 #include "util.h"
 
 void get_abs_path(Contents *contents, char *path)
@@ -43,15 +45,15 @@ int get_type(char *abs_path)
 
   for reference:
   typedef struct {
-    char *abs_path;
-    char **files;
-    char **dirs;
-    size_t file_count;
-    size_t dir_count;
+  char *abs_path;
+  char **files;
+  char **dirs;
+  size_t file_count;
+  size_t dir_count;
   } Contents;
 
 */
-void cleanup_contents(Contents *contents)
+void cleanup(Contents *contents)
 {
 
     if(contents->abs_path) {
@@ -84,30 +86,6 @@ void cleanup_contents(Contents *contents)
     // using 'contents' ptr again WILL lead to use-after-free
 }
 
-// int get_files(Contents *contents, char *abs_path) // absolute path for clarity
-// {
-//     DIR *dr;
-//     struct dirent *en;
-//     dr = opendir(abs_path);
-//     if(!dr) {
-//         perror("cannot continue");
-//         return -1;
-//     }
-// 
-//     while((en = readdir(dr)) != NULL) {
-//         char buf[PATH_MAX];
-//         snprintf(buf, PATH_MAX, "%s/%s", abs_path, en->d_name);
-// 
-//         if(en->d_name[0] != '.' && get_type(buf) == 1 && contents->file_count < DIR_FILES_MAX/2) { // we skip the directories and only get files; 1 = file & 0 = dir
-//             contents->files[contents->file_count] = strdup(en->d_name); // these should be relative, not absolute
-//             contents->file_count++;
-//         }
-//     }
-//     closedir(dr);
-//     return 0;
-//     // returns 0 for success, -1 for failure. make sure you fail check this function, if the directory being checked doesn't exist, it will throw an error but you may still process it in Contents *
-// }
-
 int store_contents(Contents *contents, char *abs_path)
 {
     DIR *dr;
@@ -124,14 +102,18 @@ int store_contents(Contents *contents, char *abs_path)
 
         if(get_type(buf) == 0 && contents->dir_count < DIR_FILES_MAX/2) { // get only dirs
             if(strcmp(en->d_name, ".") && strcmp(en->d_name, "..")) {
-                contents->dirs[contents->dir_count] = strdup(en->d_name);
+                char *file_name = strdup(en->d_name);
+                contents->dirs[contents->dir_count] = strdup(file_name);
                 contents->dir_count++;
+                free(file_name);
             }
         }
 
         if(get_type(buf) == 1 && contents->file_count < DIR_FILES_MAX/2) { // get only files
+            char *file_name = strdup(en->d_name);
             contents->files[contents->file_count] = strdup(en->d_name);
             contents->file_count++;
+            free(file_name);
         }
 
     }
