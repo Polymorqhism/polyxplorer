@@ -158,7 +158,7 @@ void render_ui(Line *lines, Cursor *cur)
     printf("%s[1m%s[38;2;255;221;51m", esc, esc); // set formatting for the current dir (bgold)
     printf("%s%s[0m", current_path, esc); // print current dir and clear all modes
     printf("%s[2;1f", esc); // go to row 2
-    printf("%4s\tsize\tname", "num"); // print the header
+    printf("%4s\tsize\t\tname", "num"); // print the header
     for(int i = 0; i<cur->line_count; i++) {
         printf("%s[%d;1f", esc, current_row); // set it to current row
         printf("%s[2K", esc); // clears the whole line to prevent format override
@@ -172,11 +172,11 @@ void render_ui(Line *lines, Cursor *cur)
                 printf("%s[34m", esc);
             }
             if (lines[i].is_directory == 1)
-                printf("%4d\t[DIR]\t%s\n", i + 1, lines[i].file_name);
+                printf("%4d\t[DIR]\t\t%s", i + 1, lines[i].file_name);
             else if(lines[i].is_directory == 0)
-                printf("%4d\t[%ld]\t%s\n", i + 1, file_size, lines[i].file_name);
+                printf("%4d\t[%ld]\t\t%s", i + 1, file_size, lines[i].file_name);
             else if(lines[i].is_directory == 3)
-                printf("%4d\t[BACK]\t%s\n", i + 1, lines[i].file_name);
+                printf("%4d\t[BACK]\t\t%s\n", i + 1, lines[i].file_name);
             current_row++;
         }
 
@@ -185,7 +185,6 @@ void render_ui(Line *lines, Cursor *cur)
     }
     printf("%s[%d;1f", esc, current_row); // move down
     printf("d = delete; enter = open; r = rename; q = quit");
-    printf("\n");
     fflush(stdout);
 }
 
@@ -312,7 +311,7 @@ void handle_input(Cursor *cur, Line *lines)
             free(current_path);
             current_path = strdup(next_path);
 
-            int height = get_terminal_height() - 3;
+            int height = get_terminal_height() - 2;
 
             Line *new_lines = calloc(height, sizeof(Line));
             Cursor *new_cur = malloc(sizeof(Cursor));

@@ -42,7 +42,7 @@ make
 - Optionally, `sudo mv build/polyxplorer /usr/bin/px` to use it easier.
 
 ---
-v1.0.0
+v1.0.1
 - GPL-3.0 license. See LICENSE for more information.
 - Personal project, large userbase is not intended. Bugs may be reported in the issues tab of this repository.
 - No generative LLM used in this project, source code is visible with sources for certain parts of code.
