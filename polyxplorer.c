@@ -27,7 +27,7 @@
 #include "polyxplorer.h"
 #include <termios.h>
 
-#define VERSION "v1.0.2"
+#define VERSION "v1.0.3"
 struct termios orig_termios;
 
 void disable_raw() {
