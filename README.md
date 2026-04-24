@@ -44,5 +44,6 @@ make
 ---
 v1.0.4
 - GPL-3.0 license. See LICENSE for more information.
+- Full paginal support not added yet, a quick fix is to simply decrease the terminal font size.
 - Personal project, large userbase is not intended. Bugs may be reported in the issues tab of this repository.
 - No generative LLM used in this project, source code is visible with sources for certain parts of code.
