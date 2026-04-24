@@ -1,4 +1,5 @@
 #define _GNU_SOURCE
+#include <ctype.h>
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <stdio.h>
@@ -25,6 +26,16 @@ int get_terminal_height()
     ioctl(STDOUT_FILENO, TIOCGWINSZ, &w);
 
     return w.ws_row;
+}
+
+
+int get_terminal_width()
+{
+
+    struct winsize w;
+    ioctl(STDOUT_FILENO, TIOCGWINSZ, &w);
+
+    return w.ws_col;
 }
 
 void get_abs_path(Contents *contents, char *path)
@@ -124,7 +135,7 @@ int store_contents(Contents *contents, char *abs_path, Line *lines, Cursor *cur)
                 }
                 Line new_line;
                 char *file_name = strdup(en->d_name);
-                new_line.abs_path = strdup(abs_path);
+                new_line.abs_path = strdup(buf);
                 new_line.file_name = file_name;
                 new_line.is_directory = 1;
 
@@ -143,7 +154,7 @@ int store_contents(Contents *contents, char *abs_path, Line *lines, Cursor *cur)
             }
             Line new_line;
             new_line.file_name = strdup(en->d_name);
-            new_line.abs_path = strdup(abs_path);
+            new_line.abs_path = strdup(buf);
             new_line.is_directory = 0;
 
             lines[line_count] = new_line;
@@ -176,20 +187,24 @@ off_t fsize(const char *filename)
     return -1;
 }
 
+
 // display lines based on the Line struct, not file names
-void render_ui(Contents *contents, Line *lines, Cursor *cur)
+void render_ui(Line *lines, Cursor *cur)
 {
     int current_row = 1;
     for(int i = 0; i<line_count; i++) {
         printf("%s[%d;1f", esc, current_row); // set it to current row
+        printf("%s[2K", esc); // clears the whole line to prevent format override
         char *real_file = realpath(lines[i].file_name, NULL);
         off_t file_size = fsize(real_file);
-        if(file_size > 0) {
+        if(file_size >= 0) {
             if(i == cur->selected_index) {
                 printf("%s[7m", esc); // inverts color for selected one
+                printf("%s[2K", esc); // clears the whole line
             } else if(lines[i].is_directory) {
                 printf("%s[34m", esc);
             }
+
             printf("[%jd\tB]\t\t%s", file_size, lines[i].file_name); // print it out
             current_row++;
         }
@@ -198,6 +213,35 @@ void render_ui(Contents *contents, Line *lines, Cursor *cur)
         free(real_file);
     }
     printf("\n");
+}
+
+
+// we handle input based on this loop and call functions as necessary to branch out
+void handle_input(Cursor *cur, Line *lines)
+{
+    char c;
+    while (read(STDIN_FILENO, &c, 1) == 1) {
+        if(c == 'q') {
+            break;
+        }
+
+        if(c == 'j') {
+            if(cur->selected_index+1 < line_count) {
+                cur->selected_index++;
+                render_ui(lines, cur);
+                fflush(stdout);
+            }
+        } else if(c == 'k') {
+            if(cur->selected_index-1 >= 0) {
+                cur->selected_index--;
+                render_ui(lines, cur);
+                fflush(stdout);
+            }
+        } else if(c == '\n') {
+            printf("%s\n", lines[cur->selected_index].abs_path);
+            fflush(stdout);
+        }
+    }
 }
 
 void get_contents(Contents *contents, char *path, Cursor *cur, Line *lines)
@@ -223,5 +267,7 @@ void get_contents(Contents *contents, char *path, Cursor *cur, Line *lines)
         return;
     }
 
-    render_ui(contents, lines, cur);
+    render_ui(lines, cur);
+
+    handle_input(cur, lines);
 }

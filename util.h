@@ -47,6 +47,6 @@ int get_terminal_height();
 /*
   use NULL for either if cleanup is required for only one object, there is automatic checks within the function
 
-  if cleaning up lines, passing cur is required
+  if cleaning up lines, passing cur is required and will exit prematurely
  */
 void cleanup(Contents *contents, Line *lines, Cursor *cur);

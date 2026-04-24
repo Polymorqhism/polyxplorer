@@ -15,10 +15,8 @@
   . - pending
   x - finished
 
-  easy:
-
   open & print user-specified directory contents                   [x]
-  ansi codes to move choice around (with J & K)                    [.]
+  ansi codes to move choice around (with J & K)                    [x]
   allow directory traversal                                        [ ]
   add page support for many files (by getting term width)          [ ]
   modify files (r/d/o) operations                                  [ ]
@@ -27,6 +25,8 @@
   the plan:
   - Contents struct ptr will consist of the current directory; it will change with the actual current directory being viewed w/ the help of get_contents()
   - use raw ansi codes to navigate between options w/ the help of Line and Cursor structs
+  - more raw ansi codes for coloring
+  - save directory contents internally but display them paginally externally
   - use Line struct array for navigation with Cursor to track where you're at
   - r = rename
   - d = delete (with y/n confirmation)
@@ -50,11 +50,13 @@ void disable_raw() {
 
 void setup_terminal()
 {
-  tcgetattr(STDIN_FILENO, &orig_termios);
-  atexit(disable_raw);
-  struct termios raw = orig_termios;
-  raw.c_lflag &= ~(ECHO);
-  tcsetattr(STDIN_FILENO, TCSAFLUSH, &raw);
+    tcgetattr(STDIN_FILENO, &orig_termios);
+    atexit(disable_raw);
+    struct termios raw = orig_termios;
+    raw.c_lflag &= ~(ECHO | ICANON);
+    raw.c_cc[VMIN] = 1;
+    raw.c_cc[VTIME] = 0;
+    tcsetattr(STDIN_FILENO, TCSAFLUSH, &raw);
 }
 
 int main(int argc, char *argv[])
@@ -73,6 +75,7 @@ int main(int argc, char *argv[])
 
     Cursor *cur = malloc(sizeof(Cursor));
     cur->max_lines = get_terminal_height() - 1;
+    cur->selected_index = 0;
     if(argc == 1) {
         setup_terminal();
         Line *lines = malloc(sizeof(Line) * (get_terminal_height() - 1));
