@@ -2,19 +2,16 @@
 #include <libgen.h>
 #include <sys/stat.h>
 #include <sys/types.h>
-#include <stdio.h>
 #include <limits.h>
 #include <stdlib.h>
-#include <sys/types.h>
 #include <errno.h>
 #include <dirent.h>
 #include <sys/ioctl.h>
 #include <string.h>
-#include <unistd.h>
 #include "util.h"
 
 int file_count = 0;
-char *current_path = "";
+char *current_path = NULL;
 static char *esc = "\x1B";
 
 #include <sys/ioctl.h>
@@ -87,10 +84,12 @@ int store_contents(char *abs_path, Line *lines, Cursor *cur)
     free(tmp);
     dot_dot.file_name = strdup("..");
     dot_dot.is_directory = 3;
-    lines[cur->line_count] = dot_dot;
-    cur->line_count++;
 
+    if (cur->line_count < cur->max_lines) {
+        lines[cur->line_count++] = dot_dot;
+    }
     while((en = readdir(dr)) != NULL) {
+        if(cur->line_count >= cur->max_lines) break;
         char buf[PATH_MAX];
         snprintf(buf, PATH_MAX, "%s/%s", abs_path, en->d_name);
 
@@ -110,9 +109,7 @@ int store_contents(char *abs_path, Line *lines, Cursor *cur)
                 cur->line_count++;
                 file_count++;
             }
-        }
-
-        if(get_type(buf) == 1 && file_count < DIR_FILES_MAX/2) { // get only files
+        } else if(get_type(buf) == 1 && file_count < DIR_FILES_MAX/2) { // get only files
             if(cur->line_count >= cur->max_lines) {
                 break;
             }
@@ -160,9 +157,10 @@ void render_ui(Line *lines, Cursor *cur)
     printf("%s[2;1f", esc); // go to row 2
     printf("%4s\tsize\t\tname", "num"); // print the header
     for(int i = 0; i<cur->line_count; i++) {
+        if (!lines[i].file_name || !lines[i].abs_path)
+            continue;
         printf("%s[%d;1f", esc, current_row); // set it to current row
         printf("%s[2K", esc); // clears the whole line to prevent format override
-        char *real_file = realpath(lines[i].file_name, NULL);
         off_t file_size = fsize(lines[i].abs_path);
         if(file_size >= 0) {
             if(i == cur->selected_index) {
@@ -181,7 +179,6 @@ void render_ui(Line *lines, Cursor *cur)
         }
 
         printf("%s[0m", esc); // resets all modes
-        free(real_file);
     }
     printf("%s[%d;1f", esc, current_row); // move down
     printf("d = delete; enter = open; r = rename; q = quit");
@@ -220,8 +217,7 @@ void handle_input(Cursor *cur, Line *lines)
             printf("Rename file %d: ", index + 1);
             fflush(stdout);
 
-            int width = get_terminal_width();
-            char new[width] = {};
+            char new[PATH_MAX];
 
             int col = 0;
             while (read(STDIN_FILENO, &r, 1) == 1) {
@@ -242,7 +238,7 @@ void handle_input(Cursor *cur, Line *lines)
                     break;
                 }
 
-                if(col < width - 1) {
+                if(col < get_terminal_width() - 1) {
                     new[col] = r;
                     col++;
                     printf("%c", r);
@@ -254,8 +250,8 @@ void handle_input(Cursor *cur, Line *lines)
 
             printf("%s[2K\r", esc); // erase whole line
             printf("Renaming...");
-            char buf[PATH_MAX];
-            snprintf(buf, PATH_MAX, "%s/%s", current_path, new);
+            char buf[PATH_MAX+1];
+            snprintf(buf, sizeof(buf), "%s/%s", current_path, new);
 
             if(rename(lines[index].abs_path, buf) == 0 && col > 0) {
                 free(lines[index].file_name); // free both because override
