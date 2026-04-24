@@ -1,5 +1,4 @@
 #define _GNU_SOURCE
-#include <ctype.h>
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <stdio.h>
@@ -14,6 +13,7 @@
 #include "util.h"
 
 int line_count = 0;
+int file_count = 0;
 static char *esc = "\x1B";
 
 #include <sys/ioctl.h>
@@ -38,15 +38,6 @@ int get_terminal_width()
     return w.ws_col;
 }
 
-void get_abs_path(Contents *contents, char *path)
-{
-    char *abs_path;
-    abs_path = realpath(path, NULL);
-    if(abs_path) {
-        contents->abs_path = abs_path;
-    }
-}
-
 // get_type returns 0 for directory, 1 for file, and -1 for failure
 int get_type(char *abs_path)
 {
@@ -68,39 +59,8 @@ int get_type(char *abs_path)
 }
 
 // frees necessary pointers
-void cleanup(Contents *contents, Line *lines, Cursor *cur)
+void cleanup(Line *lines, Cursor *cur)
 {
-    if(contents) {
-        if(contents->abs_path) {
-            free(contents->abs_path);
-        }
-
-
-        if(contents->files) {
-            for(size_t i = 0; i < contents->file_count; i++) {
-                if(contents->files[i]) {
-                    free(contents->files[i]); // clear element mallocation
-                }
-            }
-            free(contents->files); // no more touching contents->files
-        }
-
-        if(contents->dirs) {
-            for(size_t i = 0; i < contents->dir_count; i++) {
-                if(contents->dirs[i]) {
-                    free(contents->dirs[i]);
-                }
-            }
-            free(contents->dirs); // no more touching contents->dirs
-        }
-        if(contents) {
-            free(contents); // then finally clear contents
-        }
-
-        // no need to free non-malloced pointers, they'll get cleaned up with the freeing of the struct naturally
-        // using 'contents' ptr again WILL lead to use-after-free
-    }
-
     if(lines) {
         if(!cur) {
             perror("cannot free lines w/out cursor struct");
@@ -114,7 +74,7 @@ void cleanup(Contents *contents, Line *lines, Cursor *cur)
     }
 }
 
-int store_contents(Contents *contents, char *abs_path, Line *lines, Cursor *cur)
+int store_contents(char *abs_path, Line *lines, Cursor *cur)
 {
     DIR *dr;
     struct dirent *en;
@@ -128,7 +88,7 @@ int store_contents(Contents *contents, char *abs_path, Line *lines, Cursor *cur)
         char buf[PATH_MAX];
         snprintf(buf, PATH_MAX, "%s/%s", abs_path, en->d_name);
 
-        if(get_type(buf) == 0 && contents->dir_count < DIR_FILES_MAX/2) { // get only dirs
+        if(get_type(buf) == 0 && file_count < DIR_FILES_MAX/2) { // get only dirs
             if(strcmp(en->d_name, ".") && strcmp(en->d_name, "..")) {
                 if(line_count >= cur->max_lines) {
                     break;
@@ -142,13 +102,10 @@ int store_contents(Contents *contents, char *abs_path, Line *lines, Cursor *cur)
                 lines[line_count] = new_line;
 
                 line_count++;
-                // contents->dirs[contents->dir_count] = strdup(file_name);
-                // contents->dir_count++;
-                // free(file_name);
             }
         }
 
-        if(get_type(buf) == 1 && contents->file_count < DIR_FILES_MAX/2) { // get only files
+        if(get_type(buf) == 1 && file_count < DIR_FILES_MAX/2) { // get only files
             if(line_count >= cur->max_lines) {
                 break;
             }
@@ -160,10 +117,6 @@ int store_contents(Contents *contents, char *abs_path, Line *lines, Cursor *cur)
             lines[line_count] = new_line;
 
             line_count++;
-            // char *file_name = strdup(en->d_name);
-            // contents->files[contents->file_count] = strdup(en->d_name);
-            // contents->file_count++;
-            // free(file_name);
         }
 
     }
@@ -238,34 +191,22 @@ void handle_input(Cursor *cur, Line *lines)
                 fflush(stdout);
             }
         } else if(c == '\n') {
-            printf("%s\n", lines[cur->selected_index].abs_path);
             fflush(stdout);
+            exit(0);
         }
     }
 }
 
-void get_contents(Contents *contents, char *path, Cursor *cur, Line *lines)
+void get_contents(char *path, Cursor *cur, Line *lines)
 {
-    /* to fill:
-
-       char *abs_path;
-       char **files;
-       char **dirs;
-       size_t file_count;
-       size_t dir_count;
-
-    */
-
-    get_abs_path(contents, path);
-    contents->file_count = 0;
-    contents->dir_count = 0;
-    contents->files = malloc(sizeof(char *) * DIR_FILES_MAX/2); // divide by 2 because the limit is inclusive of directories and files (because i said so)
-    contents->dirs = malloc(sizeof(char *) * DIR_FILES_MAX/2);
-
-    if(store_contents(contents, contents->abs_path, lines, cur) == -1) {
+    char *abs_path;
+    abs_path = realpath(path, NULL);
+    if(store_contents(abs_path, lines, cur) == -1) {
         perror("failed to store contents of the directory");
         return;
     }
+
+    free(abs_path);
 
     render_ui(lines, cur);
 

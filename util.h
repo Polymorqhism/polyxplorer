@@ -3,15 +3,6 @@
 #define FILE_MAX 255 // this exists for both file lengths and directories
 #include <stddef.h>
 
-typedef struct {
-    char *abs_path;
-    char **files;
-    char **dirs;
-    size_t file_count;
-    size_t dir_count;
-} Contents;
-
-
 /*
   use Line structs for when we use ansi codes to print it
   using file_name for printing it
@@ -39,9 +30,8 @@ typedef struct {
     int max_lines;
 } Cursor;
 
-void get_abs_path(Contents *contents, char *path);
 int get_type(char *abs_path);
-void get_contents(Contents *contents, char *path, Cursor *cur, Line *lines);
+void get_contents(char *path, Cursor *cur, Line *lines);
 int get_terminal_height();
 
 /*
@@ -49,4 +39,4 @@ int get_terminal_height();
 
   if cleaning up lines, passing cur is required and will exit prematurely
  */
-void cleanup(Contents *contents, Line *lines, Cursor *cur);
+void cleanup(Line *lines, Cursor *cur);
