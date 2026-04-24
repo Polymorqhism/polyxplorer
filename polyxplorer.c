@@ -27,7 +27,7 @@
 #include "polyxplorer.h"
 #include <termios.h>
 
-#define VERSION "v1.0.3"
+#define VERSION "v1.0.4"
 struct termios orig_termios;
 
 void disable_raw() {
@@ -59,12 +59,12 @@ void setup_terminal()
 int main(int argc, char *argv[])
 {
     Cursor *cur = malloc(sizeof(Cursor));
-    cur->max_lines = get_terminal_height() - 1;
+    cur->max_lines = get_terminal_height() - 3;
     cur->selected_index = 0;
     cur->line_count = 0;
     if(argc == 1) {
         setup_terminal();
-        Line *lines = malloc(sizeof(Line) * (get_terminal_height() - 2));
+        Line *lines = malloc(sizeof(Line) * (get_terminal_height() - 3));
         if(!lines) {
             perror("no memory :rofl: ???");
             return 1;
@@ -78,7 +78,7 @@ int main(int argc, char *argv[])
     if(argc == 2) {
         if(strcmp(argv[1], "--help")) {
             setup_terminal();
-            Line *lines = malloc(sizeof(Line) * (get_terminal_height() - 1));
+            Line *lines = malloc(sizeof(Line) * (get_terminal_height() - 3));
             if(!lines) {
                 perror("no memory :rofl: ???");
                 return 1;

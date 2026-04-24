@@ -307,7 +307,7 @@ void handle_input(Cursor *cur, Line *lines)
             free(current_path);
             current_path = strdup(next_path);
 
-            int height = get_terminal_height() - 3;
+            int height = get_terminal_height();
 
             Line *new_lines = calloc(height, sizeof(Line));
             Cursor *new_cur = malloc(sizeof(Cursor));
@@ -317,7 +317,7 @@ void handle_input(Cursor *cur, Line *lines)
                 exit(1);
             }
 
-            new_cur->max_lines = height;
+            new_cur->max_lines = height - 3;
             new_cur->selected_index = 0;
             new_cur->line_count = 0;
 
