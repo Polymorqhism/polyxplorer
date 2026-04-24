@@ -212,7 +212,7 @@ void handle_input(Cursor *cur, Line *lines)
                 fflush(stdout);
             }
         } else if(c == 'r') {
-            int height = get_terminal_height();
+            int height = get_terminal_height() - 3;
             int index = cur->selected_index;
             char r;
 
@@ -311,7 +311,7 @@ void handle_input(Cursor *cur, Line *lines)
             free(current_path);
             current_path = strdup(next_path);
 
-            int height = get_terminal_height() - 2;
+            int height = get_terminal_height() - 3;
 
             Line *new_lines = calloc(height, sizeof(Line));
             Cursor *new_cur = malloc(sizeof(Cursor));
