@@ -17,7 +17,7 @@ typedef struct {
 /*
   use Cursor struct initialised once in main() to track the cursor location and the Line it is on
   the current line is determined by lines[Cursor's selected_index]
-  check bounds by checking i-- and i++'s existence
+  check bounds by checking if it exceeds the global variable which consists of the file count
   no use of column because we arent doing anything which requires it
 
   combined, we can use Cursor to track the cursor location, which also stores the current line depending on the current row
@@ -28,15 +28,12 @@ typedef struct {
 typedef struct {
     int selected_index;
     int max_lines;
+    int line_count;
 } Cursor;
 
 int get_type(char *abs_path);
 void get_contents(char *path, Cursor *cur, Line *lines);
 int get_terminal_height();
 
-/*
-  use NULL for either if cleanup is required for only one object, there is automatic checks within the function
-
-  if cleaning up lines, passing cur is required and will exit prematurely
- */
+// cleaning lines requires cursor struct
 void cleanup(Line *lines, Cursor *cur);

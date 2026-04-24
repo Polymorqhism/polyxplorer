@@ -18,8 +18,8 @@
   open & print user-specified directory contents                   [x]
   ansi codes to move choice around (with J & K)                    [x]
   allow directory traversal                                        [.]
-  add page support for many files (by getting term width)          [ ]
   modify files (r/d/o) operations                                  [ ]
+  add page support for many files (by getting term width)          [ ]
   open non-binary files in default text editor (default polyedit)  [ ]
 
   the plan:
@@ -38,6 +38,7 @@
 #include <stdlib.h>
 #include "util.h"
 #include <unistd.h>
+#include <signal.h>
 #include "polyxplorer.h"
 #include <termios.h>
 
@@ -51,6 +52,16 @@ void disable_raw() {
 
 void setup_terminal()
 {
+
+    // https://stackoverflow.com/questions/54352563/block-sigint-from-terminating-program
+    sigset_t block_set;
+    sigemptyset(&block_set);
+    sigaddset(&block_set, SIGINT);
+    sigprocmask(SIG_BLOCK, &block_set, NULL);
+
+    // use ansi codes instead of system() to clear because i said so
+    printf("\x1b[?1049h"); // switches to alternate screen
+    printf("\x1B[H"); // sets cur to (0, 0)
     tcgetattr(STDIN_FILENO, &orig_termios);
     atexit(disable_raw);
     struct termios raw = orig_termios;
@@ -62,14 +73,10 @@ void setup_terminal()
 
 int main(int argc, char *argv[])
 {
-
-    // use ansi codes instead of system() to clear because i said so
-    printf("\x1b[?1049h"); // switches to alternate screen
-    printf("\x1B[H"); // sets cur to (0, 0)
-
     Cursor *cur = malloc(sizeof(Cursor));
     cur->max_lines = get_terminal_height() - 1;
     cur->selected_index = 0;
+    cur->line_count = 0;
     if(argc == 1) {
         setup_terminal();
         Line *lines = malloc(sizeof(Line) * (get_terminal_height() - 1));
@@ -94,7 +101,7 @@ int main(int argc, char *argv[])
             get_contents(argv[1], cur, lines);
             cleanup(lines, cur);
         } else {
-            printf("polyxplorer %s\n\nofficial page: https://github.com/Polymorqhism/polyxplorer\n\n%s --help\t- to show this help page\n%s [path]\t- open directory. will open cwd\n", VERSION, bin_name, bin_name);
+            printf("polyxplorer %s\n\nofficial page: https://github.com/Polymorqhism/polyxplorer\n\n%s --help\t- to show this help page\n%s [path]\t- open directory, leave blank for cwd\n", VERSION, bin_name, bin_name);
             free(cur);
             return 1;
         }
