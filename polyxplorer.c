@@ -45,7 +45,8 @@
 struct termios orig_termios;
 
 void disable_raw() {
-  tcsetattr(STDIN_FILENO, TCSAFLUSH, &orig_termios);
+    tcsetattr(STDIN_FILENO, TCSAFLUSH, &orig_termios);
+    printf("\x1b[?1049l"); // goes back to normal screen
 }
 
 void setup_terminal()
@@ -63,7 +64,7 @@ int main(int argc, char *argv[])
 {
 
     // use ansi codes instead of system() to clear because i said so
-    printf("\x1B[2J"); // clears screen
+    printf("\x1b[?1049h"); // switches to alternate screen
     printf("\x1B[H"); // sets cur to (0, 0)
 
     Cursor *cur = malloc(sizeof(Cursor));

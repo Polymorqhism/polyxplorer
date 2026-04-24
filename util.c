@@ -14,6 +14,7 @@
 
 int line_count = 0;
 int file_count = 0;
+char *current_path = "";
 static char *esc = "\x1B";
 
 #include <sys/ioctl.h>
@@ -144,7 +145,12 @@ off_t fsize(const char *filename)
 // display lines based on the Line struct, not file names
 void render_ui(Line *lines, Cursor *cur)
 {
-    int current_row = 1;
+    int current_row = 3;
+    printf("%s[1;1f", esc); // set it to current row
+    printf("%s[1m%s[38;2;255;221;51m", esc, esc); // set formatting for the current dir
+    printf("%s%s[0m", current_path, esc); // print current dir and clear all modes
+    printf("%s[2;1f", esc); // go to row 2
+    printf("%4s\tsize\t\tname", "num"); // print the header
     for(int i = 0; i<line_count; i++) {
         printf("%s[%d;1f", esc, current_row); // set it to current row
         printf("%s[2K", esc); // clears the whole line to prevent format override
@@ -158,7 +164,7 @@ void render_ui(Line *lines, Cursor *cur)
                 printf("%s[34m", esc);
             }
 
-            printf("[%jd\tB]\t\t%s", file_size, lines[i].file_name); // print it out
+            printf("%4d\t[%jd\tB]\t%s", i+1, file_size, lines[i].file_name); // print it out
             current_row++;
         }
 
@@ -205,6 +211,7 @@ void get_contents(char *path, Cursor *cur, Line *lines)
         perror("failed to store contents of the directory");
         return;
     }
+    current_path = strdup(abs_path);
 
     free(abs_path);
 
