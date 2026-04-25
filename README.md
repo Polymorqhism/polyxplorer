@@ -34,7 +34,7 @@
   - `j` & `k` - Move selection down/up
 
 ## Installation:
-- Dependencies/prerequisites: Linux
+- Dependencies/prerequisites: xclip
 ```
 git clone https://github.com/Polymorqhism/polyxplorer.git
 cd polyxplorer
