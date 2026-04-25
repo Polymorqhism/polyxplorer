@@ -27,7 +27,7 @@
 #include "polyxplorer.h"
 #include <termios.h>
 
-#define VERSION "v1.0.5"
+#define VERSION "v1.1.0"
 struct termios orig_termios;
 
 void disable_raw() {
@@ -44,7 +44,6 @@ void setup_terminal()
     sigaddset(&block_set, SIGINT);
     sigprocmask(SIG_BLOCK, &block_set, NULL);
 
-    // use ansi codes instead of system() to clear because i said so
     printf("\x1b[?1049h"); // switches to alternate screen
     printf("\x1B[H"); // sets cur to (0, 0)
     tcgetattr(STDIN_FILENO, &orig_termios);
@@ -62,6 +61,9 @@ int main(int argc, char *argv[])
     cur->max_lines = get_terminal_height() - 3;
     cur->selected_index = 0;
     cur->line_count = 0;
+
+    Clipboard cb = init_clipboard();
+
     if(argc == 1) {
         setup_terminal();
         Line *lines = malloc(sizeof(Line) * (get_terminal_height() - 3));
@@ -69,8 +71,8 @@ int main(int argc, char *argv[])
             perror("no memory :rofl: ???");
             return 1;
         }
-        get_contents(".", cur, lines); // set rel path to '.' because i dont want to force users to enter something like `px .` when using this
-        cleanup(lines, cur);
+        get_contents(".", cur, lines, &cb); // set rel path to '.' because i dont want to force users to enter something like `px .` when using this
+        cleanup(lines, cur, &cb);
     }
 
 
@@ -83,8 +85,8 @@ int main(int argc, char *argv[])
                 perror("no memory :rofl: ???");
                 return 1;
             }
-            get_contents(argv[1], cur, lines);
-            cleanup(lines, cur);
+            get_contents(argv[1], cur, lines, &cb);
+            cleanup(lines, cur, &cb);
         } else {
             printf("polyxplorer %s\n\nofficial page: https://github.com/Polymorqhism/polyxplorer\n\n%s --help\t- to show this help page\n%s [path]\t- open directory, leave blank for cwd\n", VERSION, bin_name, bin_name);
             free(cur);

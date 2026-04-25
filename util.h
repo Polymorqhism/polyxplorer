@@ -2,6 +2,7 @@
 #define PATH_MAX 4096
 #define FILE_MAX 255 // this exists for both file lengths and directories
 #include <stddef.h>
+#include <sys/types.h>
 
 /*
   use Line structs for when we use ansi codes to print it
@@ -13,6 +14,11 @@ typedef struct {
     char *abs_path;
     int is_directory;
 } Line;
+
+typedef struct {
+    int fd;
+    pid_t pid;
+} Clipboard;
 
 /*
   use Cursor struct initialised once in main() to track the cursor location and the Line it is on
@@ -32,8 +38,10 @@ typedef struct {
 } Cursor;
 
 int get_type(char *abs_path);
-void get_contents(char *path, Cursor *cur, Line *lines);
+void get_contents(char *path, Cursor *cur, Line *lines, Clipboard *cb);
 int get_terminal_height();
 
 // cleaning lines requires cursor struct
-void cleanup(Line *lines, Cursor *cur);
+void cleanup(Line *lines, Cursor *cur, Clipboard *cb);
+void copy_file(Cursor *cur, Line *lines, Clipboard *cb);
+Clipboard init_clipboard();

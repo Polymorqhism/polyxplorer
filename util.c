@@ -1,6 +1,8 @@
 #define _GNU_SOURCE
 #include <libgen.h>
+#include <fcntl.h>
 #include <sys/stat.h>
+#include <sys/wait.h>
 #include <sys/types.h>
 #include <limits.h>
 #include <stdlib.h>
@@ -50,7 +52,7 @@ int get_type(char *path)
 }
 
 // frees necessary pointers
-void cleanup(Line *lines, Cursor *cur)
+void cleanup(Line *lines, Cursor *cur, Clipboard *cb)
 {
     if(lines) {
         if(!cur) {
@@ -65,6 +67,14 @@ void cleanup(Line *lines, Cursor *cur)
         }
         free(cur);
         free(lines);
+    }
+
+    if(cb) {
+        if(cb->fd != -1) {
+            close(cb->fd);
+            waitpid(cb->pid, NULL, 0);
+            cb->fd = -1;
+        }
     }
 }
 
@@ -280,6 +290,48 @@ void prompt_delete_file(Cursor *cur, Line *lines)
 }
 
 
+Clipboard init_clipboard()
+{
+    Clipboard clip = {-1, -1};
+
+    int pipefd[2];
+    if(pipe(pipefd) == -1) {
+        perror("pipe");
+        return clip;
+    }
+
+    pid_t pid = fork();
+
+    if(pid == 0) { // this is the child process
+        close(pipefd[1]);
+
+        // set stdin to the pipe read end
+        if(dup2(pipefd[0], STDIN_FILENO) == -1) {
+            perror("dup2");
+            exit(1);
+        }
+        close(pipefd[0]);
+
+        // get stdout/stderr out of the from terminal
+        int devnull = open("/dev/null", O_WRONLY);
+        dup2(devnull, STDOUT_FILENO);
+        dup2(devnull, STDERR_FILENO);
+
+        execlp("xclip", "xclip", "-selection", "clipboard", "-t", "text/uri-list", NULL);
+
+        perror("execlp failed");
+        exit(1);
+    } else if(pid > 0) {
+        close(pipefd[0]);
+        clip.fd = pipefd[1];
+        clip.pid = pid;
+    } else {
+        perror("fork");
+    }
+
+    return clip;
+}
+
 int go_into_directory(Cursor **cur, Line **lines)
 {
     if((*lines)[(*cur)->selected_index].is_directory < 1) {
@@ -316,7 +368,7 @@ int go_into_directory(Cursor **cur, Line **lines)
         exit(1);
     }
 
-    cleanup((*lines), (*cur));
+    cleanup((*lines), (*cur), NULL);
     free(next_path);
 
     (*lines) = new_lines;
@@ -327,16 +379,26 @@ int go_into_directory(Cursor **cur, Line **lines)
     return 0;
 }
 
+void copy_file(Cursor *cur, Line *lines, Clipboard *cb)
+{
+    int index = cur->selected_index;
+    char *abs_path = lines[index].abs_path; // dont free this because we dont copy it with strdup
+
+    if(cb->fd == -1) return;
+    dprintf(cb->fd, "file://%s\n", abs_path); // abs_path will only get the file directory for some reason, not the actual file
+    fsync(cb->fd);
+}
+
+
 // we handle input based on this loop and call functions as necessary to branch out
-void handle_input(Cursor *cur, Line *lines)
+void handle_input(Cursor *cur, Line *lines, Clipboard *cb)
 {
     char c;
     while (read(STDIN_FILENO, &c, 1) == 1) {
         if(c == 'q') {
-            cleanup(lines, cur);
+            cleanup(lines, cur, cb);
             exit(0);
         }
-
         if(c == 'j') {
             if(cur->selected_index+1 < cur->line_count) {
                 cur->selected_index++;
@@ -354,14 +416,22 @@ void handle_input(Cursor *cur, Line *lines)
         } else if(c == 'd') {
             prompt_delete_file(cur, lines);
         } else if(c == '\n') {
+            /*    why ptr ptrs and not just ptr for cur and lines?
+                  - because we have to modify the pointer, not the struct itself
+                  - we are overwriting the struct pointer, which we can't do with just a pointer being passed in, that'll fail to work because:
+                  - the scope of the pointer will be within the function, when we exit out, it will be lost with it
+                  - if we point to the pointer of the struct, we can modify the pointer as we need, thus the &cur and &lines argument
+            */
             if(go_into_directory(&cur, &lines) == 1) {
                 continue;
             }
+        } else if(c == 'c') {
+            copy_file(cur, lines, cb);
         }
     }
 }
 
-void get_contents(char *path, Cursor *cur, Line *lines)
+void get_contents(char *path, Cursor *cur, Line *lines, Clipboard *cb)
 {
     char *abs_path;
     abs_path = realpath(path, NULL);
@@ -375,5 +445,5 @@ void get_contents(char *path, Cursor *cur, Line *lines)
 
     render_ui(lines, cur);
 
-    handle_input(cur, lines);
+    handle_input(cur, lines, cb);
 }
