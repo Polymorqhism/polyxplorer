@@ -181,10 +181,151 @@ void render_ui(Line *lines, Cursor *cur)
         printf("%s[0m", esc); // resets all modes
     }
     printf("%s[%d;1f", esc, current_row); // move down
-    printf("d = delete; enter = open; r = rename; q = quit");
+    printf("d = delete; enter = open; r = rename; q = quit; c = copy file to clipboard");
     fflush(stdout);
 }
 
+
+// branching both functions out of handle_input for readability
+void prompt_rename_file(Cursor *cur, Line *lines)
+{
+
+    int height = get_terminal_height() - 3;
+    int index = cur->selected_index;
+    char r;
+
+    printf("%s[%d;1f", esc, height-1); // set it to last row
+    printf("Rename file %d: ", index + 1);
+    fflush(stdout);
+
+    char new[PATH_MAX];
+
+    int col = 0;
+    while (read(STDIN_FILENO, &r, 1) == 1) {
+        if(r == 127 || r == 8) {
+            if(col > 0) {
+                col--;
+                new[col] = '\0';
+                printf("\b \b"); // go back
+            }
+
+            fflush(stdout);
+            continue;
+        }
+
+        if(r == '\n') {
+            printf("%s[2K", esc); // erase whole line
+            fflush(stdout);
+            break;
+        }
+
+        if(col < get_terminal_width() - 1) {
+            new[col] = r;
+            col++;
+            printf("%c", r);
+        }
+        fflush(stdout);
+    }
+
+    new[col] = '\0';
+
+    printf("%s[2K\r", esc); // erase whole line
+    printf("Renaming...");
+    char buf[PATH_MAX+1];
+    snprintf(buf, sizeof(buf), "%s/%s", current_path, new);
+
+    if(rename(lines[index].abs_path, buf) == 0 && col > 0) {
+        free(lines[index].file_name); // free both because override
+        free(lines[index].abs_path);
+
+        lines[index].file_name = strdup(new);
+        lines[index].abs_path = strdup(buf);
+
+        printf("%s[2K\r", esc); // erase whole line
+        printf("Successfully renamed.");
+        render_ui(lines, cur);
+    } else {
+        printf("%s[2K\r", esc); // erase whole line
+        printf("Failed to rename. Check permissions?");
+    }
+
+    fflush(stdout);
+
+}
+
+void prompt_delete_file(Cursor *cur, Line *lines)
+{
+    int height = get_terminal_height();
+    char y;
+
+    printf("%s[%d;1f", esc, height-1); // set it to last row
+    printf("Delete %s? Click y to confirm.", lines[cur->selected_index].file_name);
+    fflush(stdout);
+
+    while (read(STDIN_FILENO, &y, 1) == 1) {
+        if(y == 'y') {
+            int index = cur->selected_index;
+            remove(lines[index].abs_path);
+            free(lines[index].abs_path);
+            free(lines[index].file_name);
+            memmove(&lines[index], &lines[index + 1], (cur->line_count - index - 1) * sizeof(lines[0]));
+            cur->line_count--;
+            cur->selected_index = 0;
+            render_ui(lines, cur);
+            break;
+        }
+    }
+
+    printf("%s[2K", esc); // erase whole line
+}
+
+
+int go_into_directory(Cursor **cur, Line **lines)
+{
+    if((*lines)[(*cur)->selected_index].is_directory < 1) {
+        return 1;
+    }
+
+    char *next_path = strdup((*lines)[(*cur)->selected_index].abs_path);
+    if (!next_path) {
+        perror("strdup failed");
+        exit(1);
+    }
+
+    free(current_path);
+    current_path = strdup(next_path);
+
+    int height = get_terminal_height();
+
+    Line *new_lines = calloc(height, sizeof(Line));
+    Cursor *new_cur = malloc(sizeof(Cursor));
+
+    if(!new_lines || !new_cur) {
+        perror("no memory ur pc SUCKS...");
+        exit(1);
+    }
+
+    new_cur->max_lines = height - 3;
+    new_cur->selected_index = 0;
+    new_cur->line_count = 0;
+
+    file_count = 0;
+
+    if(store_contents(next_path, new_lines, new_cur) == -1) {
+        perror("failed to store contents of dir");
+        exit(1);
+    }
+
+    cleanup((*lines), (*cur));
+    free(next_path);
+
+    (*lines) = new_lines;
+    (*cur) = new_cur;
+
+    render_ui((*lines), (*cur));
+
+    return 0;
+}
 
 // we handle input based on this loop and call functions as necessary to branch out
 void handle_input(Cursor *cur, Line *lines)
@@ -209,132 +350,13 @@ void handle_input(Cursor *cur, Line *lines)
                 fflush(stdout);
             }
         } else if(c == 'r') {
-            int height = get_terminal_height() - 3;
-            int index = cur->selected_index;
-            char r;
-
-            printf("%s[%d;1f", esc, height-1); // set it to last row
-            printf("Rename file %d: ", index + 1);
-            fflush(stdout);
-
-            char new[PATH_MAX];
-
-            int col = 0;
-            while (read(STDIN_FILENO, &r, 1) == 1) {
-                if(r == 127 || r == 8) {
-                    if(col > 0) {
-                        col--;
-                        new[col] = '\0';
-                        printf("\b \b"); // go back
-                    }
-
-                    fflush(stdout);
-                    continue;
-                }
-
-                if(r == '\n') {
-                    printf("%s[2K", esc); // erase whole line
-                    fflush(stdout);
-                    break;
-                }
-
-                if(col < get_terminal_width() - 1) {
-                    new[col] = r;
-                    col++;
-                    printf("%c", r);
-                }
-                fflush(stdout);
-            }
-
-            new[col] = '\0';
-
-            printf("%s[2K\r", esc); // erase whole line
-            printf("Renaming...");
-            char buf[PATH_MAX+1];
-            snprintf(buf, sizeof(buf), "%s/%s", current_path, new);
-
-            if(rename(lines[index].abs_path, buf) == 0 && col > 0) {
-                free(lines[index].file_name); // free both because override
-                free(lines[index].abs_path);
-
-                lines[index].file_name = strdup(new);
-                lines[index].abs_path = strdup(buf);
-
-                printf("%s[2K\r", esc); // erase whole line
-                printf("Successfully renamed.");
-                render_ui(lines, cur);
-            } else {
-                printf("%s[2K\r", esc); // erase whole line
-                printf("Failed to rename. Check permissions?");
-            }
-
-            fflush(stdout);
+            prompt_rename_file(cur, lines); // make code modular and clean to read
         } else if(c == 'd') {
-            int height = get_terminal_height();
-            char y;
-
-            printf("%s[%d;1f", esc, height-1); // set it to last row
-            printf("Delete %s? Click y to confirm.", lines[cur->selected_index].file_name);
-            fflush(stdout);
-
-            while (read(STDIN_FILENO, &y, 1) == 1) {
-                if(y == 'y') {
-                    int index = cur->selected_index;
-                    remove(lines[index].abs_path);
-                    free(lines[index].abs_path);
-                    free(lines[index].file_name);
-                    memmove(&lines[index], &lines[index + 1], (cur->line_count - index - 1) * sizeof(lines[0]));
-                    cur->line_count--;
-                    cur->selected_index = 0;
-                    render_ui(lines, cur);
-                    break;
-                }
-            }
-
-            printf("%s[2K", esc); // erase whole line
-
+            prompt_delete_file(cur, lines);
         } else if(c == '\n') {
-            if(lines[cur->selected_index].is_directory < 1) {
+            if(go_into_directory(&cur, &lines) == 1) {
                 continue;
             }
-
-            char *next_path = strdup(lines[cur->selected_index].abs_path);
-            if (!next_path) {
-                perror("strdup failed");
-                exit(1);
-            }
-
-            free(current_path);
-            current_path = strdup(next_path);
-
-            int height = get_terminal_height();
-
-            Line *new_lines = calloc(height, sizeof(Line));
-            Cursor *new_cur = malloc(sizeof(Cursor));
-
-            if(!new_lines || !new_cur) {
-                perror("no memory ur pc SUCKS...");
-                exit(1);
-            }
-
-            new_cur->max_lines = height - 3;
-            new_cur->selected_index = 0;
-            new_cur->line_count = 0;
-
-            file_count = 0;
-
-            if(store_contents(next_path, new_lines, new_cur) == -1) {
-                perror("failed to store contents of dir");
-                exit(1);
-            }
-
-            cleanup(lines, cur);
-            free(next_path);
-
-            lines = new_lines;
-            cur = new_cur;
-
-            render_ui(lines, cur);
         }
     }
 }

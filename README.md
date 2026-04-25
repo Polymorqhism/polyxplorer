@@ -42,7 +42,7 @@ make
 - Optionally, `sudo mv build/polyxplorer /usr/bin/px` to use it easier.
 
 ---
-v1.0.4
+v1.0.5
 - GPL-3.0 license. See LICENSE for more information.
 - Full paginal support not added yet, a quick fix is to simply decrease the terminal font size.
 - Personal project, large userbase is not intended. Bugs may be reported in the issues tab of this repository.
